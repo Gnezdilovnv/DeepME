@@ -10,12 +10,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="16sp"
-        android:textColor="#e6edf3"
+        android:textColor="#58a6ff"
         android:textStyle="bold" />
     <TextView
-        android:id="@+id/repo_url"
+        android:id="@+id/repo_desc"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:textColor="#8b949e" />
+        android:textColor="#8b949e"
+        android:layout_marginTop="4dp" />
 </LinearLayout>
