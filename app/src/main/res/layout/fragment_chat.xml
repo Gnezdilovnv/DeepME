@@ -4,12 +4,30 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#0d1117">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#161b22"
+        android:padding="4dp">
+        <Spinner
+            android:id="@+id/project_spinner"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1" />
+        <Button
+            android:id="@+id/new_project_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="+"
+            android:textColor="#fff"
+            android:backgroundTint="#238636" />
+    </LinearLayout>
     <Spinner
         android:id="@+id/model_spinner"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="#161b22"
-        android:textColor="#e6edf3" />
+        android:layout_height="40dp"
+        android:background="#161b22" />
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
@@ -27,7 +45,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Сообщение DeepSeek..."
+            android:hint="Спроси AI-агента..."
             android:textColorHint="#8b949e"
             android:textColor="#e6edf3"
             android:background="@drawable/bg_input"
