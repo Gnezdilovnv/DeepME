@@ -9,7 +9,6 @@ import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,7 +16,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.deepme.R
 import com.deepme.network.ApiClient
 import com.deepme.network.ChatRequest
+import com.deepme.utils.Logger
 import kotlinx.coroutines.launch
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 
 class ChatFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
@@ -28,11 +30,14 @@ class ChatFragment : Fragment() {
     private val messages = mutableListOf<ChatMessage>()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+        Logger.log("ChatFragment onCreateView")
         return inflater.inflate(R.layout.fragment_chat, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Logger.log("ChatFragment onViewCreated")
+        
         recyclerView = view.findViewById(R.id.recycler_view)
         inputEditText = view.findViewById(R.id.input_edit_text)
         sendButton = view.findViewById(R.id.send_button)
@@ -42,8 +47,10 @@ class ChatFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.adapter = adapter
 
-        messages.add(ChatMessage("👋 Привет! Я DeepME на базе DeepSeek-V4 Pro", false))
+        val welcomeMsg = ChatMessage("👋 Привет! Я DeepME\\n\\n⚠️ Сервер не подключен.\\nНастройте сервер в Настройках.", false)
+        messages.add(welcomeMsg)
         adapter.notifyDataSetChanged()
+        Logger.log("ChatFragment initialized with ${messages.size} messages")
 
         sendButton.setOnClickListener {
             val text = inputEditText.text.toString().trim()
@@ -52,6 +59,7 @@ class ChatFragment : Fragment() {
     }
 
     private fun sendMessage(text: String) {
+        Logger.log("Sending message: $text")
         inputEditText.setText("")
         messages.add(ChatMessage(text, true))
         adapter.notifyItemInserted(messages.size - 1)
@@ -62,21 +70,34 @@ class ChatFragment : Fragment() {
 
         lifecycleScope.launch {
             try {
+                Logger.log("Calling API...")
                 val response = ApiClient.apiService.sendMessage(ChatRequest(text))
                 progressBar.visibility = View.GONE
                 sendButton.isEnabled = true
                 val reply = response.response ?: "❌ Пустой ответ"
+                Logger.log("API response: $reply")
                 messages.add(ChatMessage(reply, false))
                 adapter.notifyItemInserted(messages.size - 1)
                 recyclerView.scrollToPosition(messages.size - 1)
+            } catch (e: ConnectException) {
+                handleError("Сервер недоступен. Проверьте подключение.")
+            } catch (e: SocketTimeoutException) {
+                handleError("Таймаут соединения. Сервер не отвечает.")
             } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                sendButton.isEnabled = true
-                Toast.makeText(context, "❌ ${e.message}", Toast.LENGTH_SHORT).show()
-                messages.add(ChatMessage("❌ ${e.message}", false))
-                adapter.notifyItemInserted(messages.size - 1)
+                Logger.log("Error: ${e.message}")
+                handleError("❌ ${e.message}")
             }
         }
+    }
+
+    private fun handleError(error: String) {
+        Logger.log("ERROR: $error")
+        progressBar.visibility = View.GONE
+        sendButton.isEnabled = true
+        messages.add(ChatMessage(error, false))
+        adapter.notifyItemInserted(messages.size - 1)
+        recyclerView.scrollToPosition(messages.size - 1)
+        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
     }
 
     data class ChatMessage(val text: String, val isUser: Boolean)
