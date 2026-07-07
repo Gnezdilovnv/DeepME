@@ -14,14 +14,22 @@
             android:id="@+id/project_spinner"
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:background="#161b22" />
         <Button
             android:id="@+id/new_project_button"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:text="+"
-            android:textColor="#fff"
+            android:text="📂"
+            android:textSize="16sp"
             android:backgroundTint="#238636" />
+        <ImageButton
+            android:id="@+id/clear_chat_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:backgroundTint="#da3633"
+            android:layout_marginStart="4dp" />
     </LinearLayout>
     <Spinner
         android:id="@+id/model_spinner"
@@ -45,12 +53,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Спроси AI-агента..."
+            android:hint="Спроси DeepME агента..."
             android:textColorHint="#8b949e"
             android:textColor="#e6edf3"
             android:background="@drawable/bg_input"
             android:padding="12dp"
-            android:maxLines="3" />
+            android:maxLines="5"
+            android:inputType="textMultiLine" />
         <ProgressBar
             android:id="@+id/progress_bar"
             android:layout_width="wrap_content"
