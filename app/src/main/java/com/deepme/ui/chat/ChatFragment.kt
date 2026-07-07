@@ -1,297 +1,255 @@
 package com.deepme.ui.chat
-
 import android.app.AlertDialog
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
+import android.content.*
 import android.os.Bundle
 import android.text.method.LinkMovementMethod
 import android.view.*
 import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.*
 import com.deepme.R
 import com.deepme.agent.AIAgent
-import com.deepme.network.ApiClient
-import com.deepme.network.Message
-import com.deepme.utils.Logger
-import com.deepme.utils.TokenManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import com.deepme.network.*
+import com.deepme.utils.*
+import kotlinx.coroutines.*
+import org.json.*
 import java.io.File
 
 class ChatFragment : Fragment() {
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var adapter: ChatAdapter
-    private lateinit var inputEditText: EditText
-    private lateinit var sendButton: ImageButton
-    private lateinit var progressBar: ProgressBar
-    private lateinit var modelSpinner: Spinner
-    private lateinit var projectSpinner: Spinner
-    private lateinit var newProjectButton: Button
-    private lateinit var clearChatButton: ImageButton
-    private val messages = mutableListOf<ChatMessage>()
-    private val models = listOf("deepseek-chat", "deepseek-reasoner", "deepseek-v3")
-    private var currentProject = "основной"
-    private val projects = mutableListOf("основной")
+    private lateinit var rv: RecyclerView
+    private lateinit var ad: ChatAdapter
+    private lateinit var inp: EditText
+    private lateinit var snd: ImageButton
+    private lateinit var prg: ProgressBar
+    private lateinit var msp: Spinner
+    private lateinit var psp: Spinner
+    private lateinit var npb: Button
+    private lateinit var clb: ImageButton
+    private lateinit var inf: TextView
+    private val msgs = ArrayList<CM>()
+    private var cp = "основной"
+    private val prs = ArrayList<String>()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return inflater.inflate(R.layout.fragment_chat, container, false)
-    }
+    override fun onCreateView(i: LayoutInflater, c: ViewGroup?, b: Bundle?) = i.inflate(R.layout.fragment_chat, c, false)
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        recyclerView = view.findViewById(R.id.recycler_view)
-        inputEditText = view.findViewById(R.id.input_edit_text)
-        sendButton = view.findViewById(R.id.send_button)
-        progressBar = view.findViewById(R.id.progress_bar)
-        modelSpinner = view.findViewById(R.id.model_spinner)
-        projectSpinner = view.findViewById(R.id.project_spinner)
-        newProjectButton = view.findViewById(R.id.new_project_button)
-        clearChatButton = view.findViewById(R.id.clear_chat_button)
+    override fun onViewCreated(v: View, b: Bundle?) {
+        super.onViewCreated(v, b)
+        rv = v.findViewById(R.id.recycler_view)
+        inp = v.findViewById(R.id.input_edit_text)
+        snd = v.findViewById(R.id.send_button)
+        prg = v.findViewById(R.id.progress_bar)
+        msp = v.findViewById(R.id.model_spinner)
+        psp = v.findViewById(R.id.project_spinner)
+        npb = v.findViewById(R.id.new_project_button)
+        clb = v.findViewById(R.id.clear_chat_button)
+        inf = v.findViewById(R.id.model_info_text)
 
-        adapter = ChatAdapter(messages) { msg ->
-            showCopyMenu(msg)
-        }
-        recyclerView.layoutManager = LinearLayoutManager(context)
-        recyclerView.adapter = adapter
+        ad = ChatAdapter(msgs) { showMenu(it) }
+        rv.layoutManager = LinearLayoutManager(context)
+        rv.adapter = ad
 
-        // Модели
-        val modelAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, models)
-        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        modelSpinner.adapter = modelAdapter
-        modelSpinner.setSelection(models.indexOf(ApiClient.deepSeekModel))
-        modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        val mn = ApiClient.models.map { "${it.name} | ${it.desc}" }
+        msp.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, mn)
+            .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        msp.setSelection(ApiClient.models.indexOfFirst { it.id == ApiClient.deepSeekModel }.coerceAtLeast(0))
+        msp.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                ApiClient.deepSeekModel = models[pos]
+                ApiClient.deepSeekModel = ApiClient.models[pos].id
+                val m = ApiClient.models[pos]
+                inf.text = "💰 Вход: ${m.priceIn} | Выход: ${m.priceOut} за 1M токенов"
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
+        val dm = ApiClient.models.first { it.id == ApiClient.deepSeekModel }
+        inf.text = "💰 Вход: ${dm.priceIn} | Выход: ${dm.priceOut} за 1M токенов"
 
-        // Проекты
-        loadProjects()
-        updateProjectSpinner()
+        prs.add("основной")
+        loadPrj()
+        updPrj()
 
-        newProjectButton.setOnClickListener { showNewProjectDialog() }
-        clearChatButton.setOnClickListener { clearCurrentChat() }
-
-        if (!TokenManager.isAuthorized(requireContext())) {
-            addMessage("⚠️ Настройте API ключи в разделе «Настройки»", false)
-        } else {
-            addMessage("🤖 DeepME готов к работе\nМодель: ${ApiClient.deepSeekModel}\nЯ умею читать и создавать файлы, выполнять команды и работать с GitHub.", false)
+        npb.setOnClickListener {
+            val et = EditText(requireContext()).apply { hint = "Название проекта"; setTextColor(0xFFE6EDF3.toInt()) }
+            AlertDialog.Builder(requireContext())
+                .setTitle("Новый проект")
+                .setView(et)
+                .setPositiveButton("Создать") { _, _ ->
+                    val n = et.text.toString().trim()
+                    if (n.isNotEmpty() && !prs.contains(n)) {
+                        saveHist()
+                        prs.add(n)
+                        savePrj()
+                        updPrj()
+                        psp.setSelection(prs.indexOf(n))
+                        msgs.clear()
+                        cp = n
+                        ad.notifyDataSetChanged()
+                        addMsg("📂 Проект «$n» создан", false)
+                    }
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
         }
 
-        sendButton.setOnClickListener {
-            val text = inputEditText.text.toString().trim()
-            if (text.isNotEmpty()) sendToAI(text)
+        clb.setOnClickListener {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Очистить чат?")
+                .setMessage("Все сообщения в «$cp» будут удалены")
+                .setPositiveButton("Очистить") { _, _ ->
+                    msgs.clear()
+                    ad.notifyDataSetChanged()
+                    saveHist()
+                    addMsg("🗑️ Чат очищен", false)
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
+        }
+
+        if (TokenManager.isAuthorized(requireContext())) {
+            addMsg("🤖 DeepME v2.0 готов\nМодель: ${dm.name}\n\n📁 Читаю/пишу файлы\n🖥️ Выполняю команды\n🐙 GitHub через gh CLI\n📸 Анализирую файлы\n\nНапиши что нужно сделать.", false)
+        } else {
+            addMsg("⚠️ Настройте API ключи в разделе «Настройки»", false)
+        }
+
+        snd.setOnClickListener {
+            val t = inp.text.toString().trim()
+            if (t.isNotEmpty()) send(t)
         }
     }
 
-    private fun showCopyMenu(msg: ChatMessage) {
-        val options = arrayOf("Копировать текст", "Поделиться")
+    private fun showMenu(m: CM) {
         AlertDialog.Builder(requireContext())
-            .setItems(options) { _, which ->
-                when (which) {
+            .setItems(arrayOf("Копировать текст", "Поделиться")) { _, w ->
+                when (w) {
                     0 -> {
-                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("DeepME", msg.text))
+                        val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("DeepME", m.text))
                         Toast.makeText(context, "✅ Скопировано", Toast.LENGTH_SHORT).show()
                     }
                     1 -> {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                        intent.type = "text/plain"
-                        intent.putExtra(android.content.Intent.EXTRA_TEXT, msg.text)
-                        startActivity(android.content.Intent.createChooser(intent, "Поделиться"))
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, m.text)
+                        }
+                        startActivity(Intent.createChooser(intent, "Поделиться"))
                     }
                 }
-            }
-            .show()
+            }.show()
     }
 
-    private fun showNewProjectDialog() {
-        val input = EditText(requireContext())
-        input.hint = "Название проекта"
-        input.setTextColor(0xFFE6EDF3.toInt())
-        AlertDialog.Builder(requireContext())
-            .setTitle("Новый проект")
-            .setView(input)
-            .setPositiveButton("Создать") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isNotEmpty() && !projects.contains(name)) {
-                    saveHistory()
-                    projects.add(name)
-                    saveProjectsList()
-                    updateProjectSpinner()
-                    projectSpinner.setSelection(projects.indexOf(name))
-                    messages.clear()
-                    currentProject = name
-                    adapter.notifyDataSetChanged()
-                    addMessage("📂 Проект «$name» создан", false)
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
-    private fun clearCurrentChat() {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Очистить чат?")
-            .setMessage("Все сообщения в проекте «$currentProject» будут удалены")
-            .setPositiveButton("Очистить") { _, _ ->
-                messages.clear()
-                adapter.notifyDataSetChanged()
-                saveHistory()
-                addMessage("🗑️ Чат очищен", false)
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
-    private fun sendToAI(text: String) {
+    private fun send(t: String) {
         if (!TokenManager.isAuthorized(requireContext())) {
-            addMessage("❌ Настройте API ключи в разделе «Настройки»", false)
+            addMsg("❌ Настройте API ключи в Настройках", false)
             return
         }
-        inputEditText.setText("")
-        addMessage(text, true)
-        saveHistory()
-        progressBar.visibility = View.VISIBLE
-        sendButton.isEnabled = false
+        inp.setText("")
+        addMsg(t, true)
+        saveHist()
+        prg.visibility = View.VISIBLE
+        snd.isEnabled = false
 
         lifecycleScope.launch {
             try {
-                val history = messages.map { Message(if (it.isUser) "user" else "assistant", it.text) }.takeLast(20)
-                val reply = withContext(Dispatchers.IO) {
-                    AIAgent.processMessage(requireContext(), text, history)
-                }
-                progressBar.visibility = View.GONE
-                sendButton.isEnabled = true
-                addMessage(reply, false)
-                saveHistory()
+                val h = msgs.map { Message(if (it.isUser) "user" else "assistant", it.text) }.takeLast(20)
+                val r = withContext(Dispatchers.IO) { AIAgent.process(requireContext(), t, h) }
+                prg.visibility = View.GONE
+                snd.isEnabled = true
+                addMsg(r, false)
+                saveHist()
             } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                sendButton.isEnabled = true
-                addMessage("❌ ${e.message}", false)
+                prg.visibility = View.GONE
+                snd.isEnabled = true
+                addMsg("❌ ${e.message}", false)
             }
         }
     }
 
-    private fun addMessage(text: String, isUser: Boolean) {
-        messages.add(ChatMessage(text, isUser))
-        adapter.notifyItemInserted(messages.size - 1)
-        recyclerView.scrollToPosition(messages.size - 1)
+    private fun addMsg(t: String, u: Boolean) {
+        msgs.add(CM(t, u))
+        ad.notifyItemInserted(msgs.size - 1)
+        rv.scrollToPosition(msgs.size - 1)
     }
 
-    // История
-    private fun getProjectDir(): File {
-        val dir = File(requireContext().filesDir, "projects")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
+    private fun dir() = File(requireContext().filesDir, "projects").also { if (!it.exists()) it.mkdirs() }
+    private fun hf(p: String) = File(dir(), "$p.json")
+    private fun pf() = File(dir(), "_prj.json")
+
+    private fun loadPrj() {
+        val f = pf()
+        if (f.exists()) try {
+            prs.clear()
+            val a = JSONArray(f.readText())
+            for (i in 0 until a.length()) prs.add(a.getString(i))
+        } catch (_: Exception) { prs.add("основной") }
+        if (prs.isEmpty()) prs.add("основной")
     }
 
-    private fun getHistoryFile(project: String): File = File(getProjectDir(), "$project.json")
-    private fun getProjectsFile(): File = File(getProjectDir(), "_projects.json")
+    private fun savePrj() = try {
+        val a = JSONArray()
+        prs.forEach { a.put(it) }
+        pf().writeText(a.toString())
+    } catch (_: Exception) {}
 
-    private fun loadProjects() {
-        val file = getProjectsFile()
-        if (file.exists()) {
-            try {
-                val arr = JSONArray(file.readText())
-                projects.clear()
-                for (i in 0 until arr.length()) projects.add(arr.getString(i))
-            } catch (e: Exception) { projects.add("основной") }
-        }
-        if (projects.isEmpty()) projects.add("основной")
-    }
-
-    private fun saveProjectsList() {
-        try {
-            val arr = JSONArray()
-            projects.forEach { arr.put(it) }
-            getProjectsFile().writeText(arr.toString())
-        } catch (e: Exception) { Logger.log("Ошибка сохранения проектов: ${e.message}") }
-    }
-
-    private fun updateProjectSpinner() {
-        val pAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, projects)
-        pAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        projectSpinner.adapter = pAdapter
-
-        val currentIdx = projects.indexOf(currentProject)
-        if (currentIdx >= 0) projectSpinner.setSelection(currentIdx)
-
-        projectSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+    private fun updPrj() {
+        psp.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, prs)
+            .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        val i = prs.indexOf(cp)
+        if (i >= 0) psp.setSelection(i)
+        psp.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                if (projects[pos] != currentProject) {
-                    saveHistory()
-                    currentProject = projects[pos]
-                    messages.clear()
-                    loadHistory()
-                    Logger.log("Проект: $currentProject")
+                if (prs[pos] != cp) {
+                    saveHist()
+                    cp = prs[pos]
+                    msgs.clear()
+                    loadHist()
                 }
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
     }
 
-    private fun loadHistory() {
-        val file = getHistoryFile(currentProject)
-        if (file.exists()) {
-            try {
-                val arr = JSONArray(file.readText())
-                messages.clear()
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    messages.add(ChatMessage(obj.getString("text"), obj.getBoolean("isUser")))
-                }
-                adapter.notifyDataSetChanged()
-                if (messages.isNotEmpty()) recyclerView.scrollToPosition(messages.size - 1)
-            } catch (e: Exception) { Logger.log("Ошибка истории: ${e.message}") }
-        }
-    }
-
-    private fun saveHistory() {
-        try {
-            val arr = JSONArray()
-            messages.takeLast(200).forEach { msg ->
-                arr.put(JSONObject().put("text", msg.text).put("isUser", msg.isUser))
+    private fun loadHist() {
+        val f = hf(cp)
+        if (f.exists()) try {
+            msgs.clear()
+            val a = JSONArray(f.readText())
+            for (i in 0 until a.length()) {
+                val o = a.getJSONObject(i)
+                msgs.add(CM(o.getString("text"), o.getBoolean("isUser")))
             }
-            getHistoryFile(currentProject).writeText(arr.toString())
-        } catch (e: Exception) { Logger.log("Ошибка сохранения: ${e.message}") }
+            ad.notifyDataSetChanged()
+        } catch (_: Exception) {}
     }
 
-    override fun onPause() { super.onPause(); saveHistory() }
-    override fun onDestroy() { super.onDestroy(); saveHistory() }
+    private fun saveHist() = try {
+        val a = JSONArray()
+        msgs.takeLast(200).forEach {
+            a.put(JSONObject().put("text", it.text).put("isUser", it.isUser))
+        }
+        hf(cp).writeText(a.toString())
+    } catch (_: Exception) {}
 
-    data class ChatMessage(val text: String, val isUser: Boolean)
+    override fun onPause() { super.onPause(); saveHist() }
+
+    data class CM(val text: String, val isUser: Boolean)
 
     inner class ChatAdapter(
-        private val messages: List<ChatMessage>,
-        private val onLongClick: (ChatMessage) -> Unit
+        private val ms: List<CM>,
+        private val olc: (CM) -> Unit
     ) : RecyclerView.Adapter<ChatAdapter.VH>() {
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            return VH(LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false))
+        override fun onCreateViewHolder(p: ViewGroup, vt: Int) = VH(LayoutInflater.from(p.context).inflate(R.layout.item_message, p, false))
+        override fun onBindViewHolder(h: VH, pos: Int) {
+            val m = ms[pos]
+            h.tv.text = m.text
+            h.tv.setTextIsSelectable(true)
+            h.tv.movementMethod = LinkMovementMethod.getInstance()
+            h.tv.setBackgroundResource(if (m.isUser) R.drawable.bg_user_message else R.drawable.bg_assistant_message)
+            h.tv.setTextColor(if (m.isUser) 0xFFFFFFFF.toInt() else 0xFFE6EDF3.toInt())
+            h.itemView.setOnLongClickListener { olc(m); true }
         }
-        override fun onBindViewHolder(holder: VH, pos: Int) {
-            val msg = messages[pos]
-            holder.textView.text = msg.text
-            holder.textView.setTextIsSelectable(true)
-            holder.textView.movementMethod = LinkMovementMethod.getInstance()
-            holder.textView.setBackgroundResource(if (msg.isUser) R.drawable.bg_user_message else R.drawable.bg_assistant_message)
-            holder.textView.setTextColor(if (msg.isUser) 0xFFFFFFFF.toInt() else 0xFFE6EDF3.toInt())
-            holder.itemView.setOnLongClickListener {
-                onLongClick(msg)
-                true
-            }
-        }
-        override fun getItemCount() = messages.size
-        inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            val textView: TextView = itemView.findViewById(R.id.message_text)
+        override fun getItemCount() = ms.size
+        inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+            val tv: TextView = v.findViewById(R.id.message_text)
         }
     }
 }
