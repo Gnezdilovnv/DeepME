@@ -6,4 +6,7 @@
     android:padding="12dp"
     android:layout_margin="4dp"
     android:textSize="14sp"
-    android:textColor="#e6edf3" />
+    android:textIsSelectable="true"
+    android:textColor="#e6edf3"
+    android:longClickable="true"
+    android:contextClickable="true" />
