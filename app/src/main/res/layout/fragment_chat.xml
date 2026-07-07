@@ -1,78 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#0d1117">
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="#161b22"
-        android:padding="4dp">
-        <Spinner
-            android:id="@+id/project_spinner"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="#161b22" />
-        <Button
-            android:id="@+id/new_project_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:text="📂"
-            android:textSize="16sp"
-            android:backgroundTint="#238636" />
-        <ImageButton
-            android:id="@+id/clear_chat_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_delete"
-            android:backgroundTint="#da3633"
-            android:layout_marginStart="4dp" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#0d1117">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:background="#161b22" android:padding="4dp">
+        <Spinner android:id="@+id/project_spinner" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:background="#161b22" />
+        <Button android:id="@+id/new_project_button" android:layout_width="40dp" android:layout_height="40dp" android:text="📂" android:textSize="16sp" android:backgroundTint="#238636" />
+        <ImageButton android:id="@+id/clear_chat_button" android:layout_width="40dp" android:layout_height="40dp" android:src="@android:drawable/ic_menu_delete" android:backgroundTint="#da3633" android:layout_marginStart="4dp" />
     </LinearLayout>
-    <Spinner
-        android:id="@+id/model_spinner"
-        android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:background="#161b22" />
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="8dp" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:background="#161b22">
-        <EditText
-            android:id="@+id/input_edit_text"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Спроси DeepME агента..."
-            android:textColorHint="#8b949e"
-            android:textColor="#e6edf3"
-            android:background="@drawable/bg_input"
-            android:padding="12dp"
-            android:maxLines="5"
-            android:inputType="textMultiLine" />
-        <ProgressBar
-            android:id="@+id/progress_bar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="8dp"
-            android:visibility="gone" />
-        <ImageButton
-            android:id="@+id/send_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="#238636"
-            android:src="@android:drawable/ic_menu_send"
-            android:padding="12dp"
-            android:layout_marginStart="8dp" />
+    <Spinner android:id="@+id/model_spinner" android:layout_width="match_parent" android:layout_height="40dp" android:background="#161b22" />
+    <TextView android:id="@+id/model_info_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#8b949e" android:textSize="11sp" android:padding="4dp" android:background="#161b22" android:text="💰 Выберите модель" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/recycler_view" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:padding="8dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="8dp" android:background="#161b22">
+        <EditText android:id="@+id/input_edit_text" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="Сообщение DeepME..." android:textColorHint="#8b949e" android:textColor="#e6edf3" android:background="@drawable/bg_input" android:padding="12dp" android:maxLines="5" android:inputType="textMultiLine" />
+        <ProgressBar android:id="@+id/progress_bar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_margin="8dp" android:visibility="gone" />
+        <ImageButton android:id="@+id/send_button" android:layout_width="48dp" android:layout_height="48dp" android:background="#238636" android:src="@android:drawable/ic_menu_send" android:padding="12dp" android:layout_marginStart="8dp" />
     </LinearLayout>
 </LinearLayout>
