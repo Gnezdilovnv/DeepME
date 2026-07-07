@@ -8,26 +8,27 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    private const val BASE_URL = "http://10.0.2.2:5000/"
+    private const val DEEPSEEK_URL = "https://api.deepseek.com/"
+    private const val GITHUB_URL = "https://api.github.com/"
 
-    private val loggingInterceptor = HttpLoggingInterceptor { message ->
-        Logger.log("API: $message")
-    }.apply { level = HttpLoggingInterceptor.Level.BODY }
+    var deepSeekModel = "deepseek-chat"
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .writeTimeout(5, TimeUnit.SECONDS)
-        .addInterceptor(loggingInterceptor)
+    private val logging = HttpLoggingInterceptor { Logger.log("HTTP: $it") }
+        .apply { level = HttpLoggingInterceptor.Level.BODY }
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(logging)
         .build()
 
-    val apiService: ApiService by lazy {
-        Logger.log("Creating ApiService with base URL: $BASE_URL")
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
+    val deepSeekApi: DeepSeekApi by lazy {
+        Retrofit.Builder().baseUrl(DEEPSEEK_URL).client(client)
+            .addConverterFactory(GsonConverterFactory.create()).build().create(DeepSeekApi::class.java)
+    }
+
+    val gitHubApi: GitHubApi by lazy {
+        Retrofit.Builder().baseUrl(GITHUB_URL).client(client)
+            .addConverterFactory(GsonConverterFactory.create()).build().create(GitHubApi::class.java)
     }
 }
