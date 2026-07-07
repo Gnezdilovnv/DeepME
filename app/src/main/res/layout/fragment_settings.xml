@@ -1,77 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#0d1117">
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⚙️ Настройки"
-            android:textColor="#e6edf3"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-        <TextView
-            android:id="@+id/status_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="❌ Не авторизован"
-            android:textColor="#f85149"
-            android:textSize="14sp"
-            android:layout_marginTop="8dp" />
-        <TextView
-            android:id="@+id/balance_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="💰 Баланс: не проверен"
-            android:textColor="#8b949e"
-            android:textSize="14sp"
-            android:layout_marginTop="4dp" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Модель по умолчанию:"
-            android:textColor="#e6edf3"
-            android:textSize="14sp"
-            android:layout_marginTop="16dp" />
-        <Spinner
-            android:id="@+id/settings_model_spinner"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="#161b22" />
-        <EditText
-            android:id="@+id/api_key_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:hint="DeepSeek API Key (sk-...)"
-            android:textColorHint="#8b949e"
-            android:textColor="#e6edf3"
-            android:inputType="textPassword"
-            android:background="@drawable/bg_input"
-            android:padding="12dp" />
-        <EditText
-            android:id="@+id/github_token_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="GitHub Token (ghp_...)"
-            android:textColorHint="#8b949e"
-            android:textColor="#e6edf3"
-            android:inputType="textPassword"
-            android:background="@drawable/bg_input"
-            android:padding="12dp" />
-        <Button
-            android:id="@+id/save_button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Сохранить"
-            android:backgroundTint="#238636"
-            android:textColor="#ffffff" />
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#0d1117">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚙️ Настройки DeepME" android:textColor="#e6edf3" android:textSize="20sp" android:textStyle="bold" />
+        <TextView android:id="@+id/status_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="❌ Не авторизован" android:textColor="#f85149" android:textSize="14sp" android:layout_marginTop="8dp" />
+        <TextView android:id="@+id/balance_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💰 Баланс: не проверен" android:textColor="#8b949e" android:textSize="13sp" android:layout_marginTop="4dp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Модель по умолчанию:" android:textColor="#e6edf3" android:textSize="14sp" android:layout_marginTop="16dp" />
+        <Spinner android:id="@+id/settings_model_spinner" android:layout_width="match_parent" android:layout_height="48dp" android:background="#161b22" />
+        <EditText android:id="@+id/api_key_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:hint="DeepSeek API Key (sk-...)" android:textColorHint="#8b949e" android:textColor="#e6edf3" android:inputType="textPassword" android:background="@drawable/bg_input" android:padding="12dp" />
+        <EditText android:id="@+id/github_token_input" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="GitHub Token (ghp_...)" android:textColorHint="#8b949e" android:textColor="#e6edf3" android:inputType="textPassword" android:background="@drawable/bg_input" android:padding="12dp" />
+        <Button android:id="@+id/save_button" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Сохранить" android:backgroundTint="#238636" android:textColor="#ffffff" />
     </LinearLayout>
 </ScrollView>
