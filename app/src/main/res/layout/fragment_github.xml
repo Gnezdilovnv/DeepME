@@ -11,6 +11,19 @@
         android:textColor="#e6edf3"
         android:textSize="20sp"
         android:padding="16dp" />
+    <ProgressBar
+        android:id="@+id/github_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+    <TextView
+        android:id="@+id/github_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#f85149"
+        android:padding="16dp"
+        android:visibility="gone" />
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view_github"
         android:layout_width="match_parent"
