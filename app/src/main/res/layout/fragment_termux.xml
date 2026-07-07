@@ -4,46 +4,47 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#0d1117"
-    android:padding="16dp">
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🖥️ Termux"
-        android:textColor="#e6edf3"
-        android:textSize="20sp" />
+    android:padding="8dp">
+    <ScrollView
+        android:id="@+id/termux_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#161b22"
+        android:padding="8dp">
+        <TextView
+            android:id="@+id/termux_output"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#e6edf3"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true" />
+    </ScrollView>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="8dp">
+        android:background="#161b22"
+        android:padding="4dp">
         <EditText
             android:id="@+id/termux_input"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Введите команду"
+            android:hint="команда..."
             android:textColorHint="#8b949e"
             android:textColor="#e6edf3"
             android:background="@drawable/bg_input"
-            android:padding="12dp" />
+            android:padding="8dp"
+            android:inputType="text" />
         <ImageButton
             android:id="@+id/termux_send"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:background="#238636"
             android:src="@android:drawable/ic_menu_send"
-            android:padding="12dp"
-            android:layout_marginStart="8dp" />
+            android:padding="8dp"
+            android:layout_marginStart="4dp" />
     </LinearLayout>
-    <TextView
-        android:id="@+id/termux_output"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp"
-        android:background="#161b22"
-        android:padding="12dp"
-        android:textColor="#e6edf3"
-        android:textSize="14sp"
-        android:fontFamily="monospace" />
 </LinearLayout>
