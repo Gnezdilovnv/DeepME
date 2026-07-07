@@ -1,7 +1,6 @@
 package com.deepme
 
 import android.os.Bundle
-import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.deepme.ui.chat.ChatFragment
@@ -14,38 +13,74 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var chatFragment: ChatFragment
+    private lateinit var filesFragment: FilesFragment
+    private lateinit var termuxFragment: TermuxFragment
+    private lateinit var gitHubFragment: GitHubFragment
+    private lateinit var settingsFragment: SettingsFragment
+    private var activeFragment: Fragment? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Logger.init()
-        Logger.log("MainActivity onCreate")
+        Logger.log("Запуск приложения")
         setContentView(R.layout.activity_main)
 
+        chatFragment = ChatFragment()
+        filesFragment = FilesFragment()
+        termuxFragment = TermuxFragment()
+        gitHubFragment = GitHubFragment()
+        settingsFragment = SettingsFragment()
+
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        val fragmentContainer = findViewById<FrameLayout>(R.id.fragment_container)
 
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, ChatFragment())
+                .add(R.id.fragment_container, settingsFragment, "settings").hide(settingsFragment)
+                .add(R.id.fragment_container, filesFragment, "files").hide(filesFragment)
+                .add(R.id.fragment_container, termuxFragment, "termux").hide(termuxFragment)
+                .add(R.id.fragment_container, gitHubFragment, "github").hide(gitHubFragment)
+                .add(R.id.fragment_container, chatFragment, "chat")
                 .commit()
+            activeFragment = chatFragment
+        } else {
+            chatFragment = supportFragmentManager.findFragmentByTag("chat") as ChatFragment
+            filesFragment = supportFragmentManager.findFragmentByTag("files") as FilesFragment
+            termuxFragment = supportFragmentManager.findFragmentByTag("termux") as TermuxFragment
+            gitHubFragment = supportFragmentManager.findFragmentByTag("github") as GitHubFragment
+            settingsFragment = supportFragmentManager.findFragmentByTag("settings") as SettingsFragment
         }
-        Logger.log("UI initialized")
 
         bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_chat -> { Logger.log("Nav: Chat"); loadFragment(ChatFragment()) }
-                R.id.nav_files -> { Logger.log("Nav: Files"); loadFragment(FilesFragment()) }
-                R.id.nav_termux -> { Logger.log("Nav: Termux"); loadFragment(TermuxFragment()) }
-                R.id.nav_github -> { Logger.log("Nav: GitHub"); loadFragment(GitHubFragment()) }
-                R.id.nav_settings -> { Logger.log("Nav: Settings"); loadFragment(SettingsFragment()) }
+            val fragment = when (item.itemId) {
+                R.id.nav_chat -> chatFragment
+                R.id.nav_files -> filesFragment
+                R.id.nav_termux -> termuxFragment
+                R.id.nav_github -> gitHubFragment
+                R.id.nav_settings -> settingsFragment
+                else -> chatFragment
+            }
+            if (fragment != activeFragment) {
+                supportFragmentManager.beginTransaction()
+                    .hide(activeFragment!!)
+                    .show(fragment)
+                    .commit()
+                activeFragment = fragment
             }
             true
         }
     }
 
-    private fun loadFragment(fragment: Fragment) {
-        Logger.log("Loading fragment: ${fragment.javaClass.simpleName}")
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
-            .commit()
+    override fun onBackPressed() {
+        if (activeFragment != chatFragment) {
+            supportFragmentManager.beginTransaction()
+                .hide(activeFragment!!)
+                .show(chatFragment)
+                .commit()
+            activeFragment = chatFragment
+            findViewById<BottomNavigationView>(R.id.bottom_navigation).selectedItemId = R.id.nav_chat
+        } else {
+            super.onBackPressed()
+        }
     }
 }
