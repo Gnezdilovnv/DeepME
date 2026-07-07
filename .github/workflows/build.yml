@@ -31,13 +31,37 @@ jobs:
           curl -L "https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar" -o gradle/wrapper/gradle-wrapper.jar
           ls -la gradle/wrapper/
 
-      - run: chmod +x gradlew
+      - name: Check files before build
+        run: |
+          set -x
+          echo "=== PWD ==="
+          pwd
+          echo "=== LS ==="
+          ls -la
+          echo "=== GRADLEW ==="
+          file gradlew
+          echo "=== BUILD.GRADLE ==="
+          cat build.gradle.kts
+          echo "=== SETTINGS ==="
+          cat settings.gradle.kts
+          echo "=== APP BUILD ==="
+          cat app/build.gradle.kts
+          echo "=== SOURCES ==="
+          find . -name "*.kt" -o -name "*.xml" | head -30
 
       - name: Build APK
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1
-          echo "=== APK SEARCH ==="
-          find . -name "*.apk" 2>/dev/null || echo "NO APK FOUND"
+          set -x
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          echo "=== BUILD EXIT: $? ==="
+
+      - name: Find APK
+        run: |
+          echo "=== SEARCHING APK ==="
+          find . -name "*.apk" -ls 2>/dev/null
+          echo "=== BUILD DIR ==="
+          ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "NO APK DIR"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +71,7 @@ jobs:
 
       - name: Push APK to repo
         run: |
-          APK=$(find app/build -name "*.apk" 2>/dev/null | head -1)
+          APK=$(find . -name "*.apk" 2>/dev/null | head -1)
           if [ -n "$APK" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -56,5 +80,5 @@ jobs:
             git add releases/DeepME-debug.apk
             git commit -m "Auto build APK" && git push && echo "PUSHED" || echo "No changes"
           else
-            echo "NO APK FOUND - cannot push"
+            echo "NO APK FOUND"
           fi
