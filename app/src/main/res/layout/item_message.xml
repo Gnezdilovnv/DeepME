@@ -1,12 +1,1 @@
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/message_text"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:maxWidth="300dp"
-    android:padding="12dp"
-    android:layout_margin="4dp"
-    android:textSize="14sp"
-    android:textIsSelectable="true"
-    android:textColor="#e6edf3"
-    android:longClickable="true"
-    android:contextClickable="true" />
+<TextView xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/message_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxWidth="300dp" android:padding="12dp" android:layout_margin="4dp" android:textSize="14sp" android:textIsSelectable="true" android:textColor="#e6edf3" android:longClickable="true" />
