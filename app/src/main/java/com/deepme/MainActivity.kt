@@ -24,26 +24,28 @@ class MainActivity : AppCompatActivity() {
         val fragmentContainer = findViewById<FrameLayout>(R.id.fragment_container)
 
         if (savedInstanceState == null) {
-            loadFragment(ChatFragment(), fragmentContainer.id)
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, ChatFragment())
+                .commit()
         }
         Logger.log("UI initialized")
 
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_chat -> { Logger.log("Nav: Chat"); loadFragment(ChatFragment(), fragmentContainer.id) }
-                R.id.nav_files -> { Logger.log("Nav: Files"); loadFragment(FilesFragment(), fragmentContainer.id) }
-                R.id.nav_termux -> { Logger.log("Nav: Termux"); loadFragment(TermuxFragment(), fragmentContainer.id) }
-                R.id.nav_github -> { Logger.log("Nav: GitHub"); loadFragment(GitHubFragment(), fragmentContainer.id) }
-                R.id.nav_settings -> { Logger.log("Nav: Settings"); loadFragment(SettingsFragment(), fragmentContainer.id) }
+                R.id.nav_chat -> { Logger.log("Nav: Chat"); loadFragment(ChatFragment()) }
+                R.id.nav_files -> { Logger.log("Nav: Files"); loadFragment(FilesFragment()) }
+                R.id.nav_termux -> { Logger.log("Nav: Termux"); loadFragment(TermuxFragment()) }
+                R.id.nav_github -> { Logger.log("Nav: GitHub"); loadFragment(GitHubFragment()) }
+                R.id.nav_settings -> { Logger.log("Nav: Settings"); loadFragment(SettingsFragment()) }
             }
             true
         }
     }
 
-    private fun loadFragment(fragment: Fragment, containerId: Int) {
+    private fun loadFragment(fragment: Fragment) {
         Logger.log("Loading fragment: ${fragment.javaClass.simpleName}")
         supportFragmentManager.beginTransaction()
-            .replace(containerId, fragment)
+            .replace(R.id.fragment_container, fragment)
             .commit()
     }
 }
