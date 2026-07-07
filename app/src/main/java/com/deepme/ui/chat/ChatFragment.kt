@@ -1,10 +1,12 @@
 package com.deepme.ui.chat
 
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.text.method.LinkMovementMethod
+import android.view.*
 import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -32,10 +34,11 @@ class ChatFragment : Fragment() {
     private lateinit var modelSpinner: Spinner
     private lateinit var projectSpinner: Spinner
     private lateinit var newProjectButton: Button
+    private lateinit var clearChatButton: ImageButton
     private val messages = mutableListOf<ChatMessage>()
     private val models = listOf("deepseek-chat", "deepseek-reasoner", "deepseek-v3")
-    private var currentProject = "default"
-    private val projects = mutableListOf("default")
+    private var currentProject = "основной"
+    private val projects = mutableListOf("основной")
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         return inflater.inflate(R.layout.fragment_chat, container, false)
@@ -50,8 +53,11 @@ class ChatFragment : Fragment() {
         modelSpinner = view.findViewById(R.id.model_spinner)
         projectSpinner = view.findViewById(R.id.project_spinner)
         newProjectButton = view.findViewById(R.id.new_project_button)
+        clearChatButton = view.findViewById(R.id.clear_chat_button)
 
-        adapter = ChatAdapter(messages)
+        adapter = ChatAdapter(messages) { msg ->
+            showCopyMenu(msg)
+        }
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.adapter = adapter
 
@@ -63,7 +69,6 @@ class ChatFragment : Fragment() {
         modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
                 ApiClient.deepSeekModel = models[pos]
-                Logger.log("Model: ${models[pos]}")
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
@@ -71,24 +76,14 @@ class ChatFragment : Fragment() {
         // Проекты
         loadProjects()
         updateProjectSpinner()
-        newProjectButton.setOnClickListener {
-            val name = inputEditText.text.toString().trim()
-            if (name.isNotEmpty() && !projects.contains(name)) {
-                projects.add(name)
-                saveProjects()
-                updateProjectSpinner()
-                projectSpinner.setSelection(projects.size - 1)
-                inputEditText.setText("")
-                Toast.makeText(context, "✅ Проект  создан", Toast.LENGTH_SHORT).show()
-            }
-        }
 
-        loadHistory()
+        newProjectButton.setOnClickListener { showNewProjectDialog() }
+        clearChatButton.setOnClickListener { clearCurrentChat() }
 
         if (!TokenManager.isAuthorized(requireContext())) {
-            addMessage("⚠️ Настройте API ключи в Настройках", false)
+            addMessage("⚠️ Настройте API ключи в разделе «Настройки»", false)
         } else {
-            addMessage("🤖 DeepME Agent готов! Модель: ${ApiClient.deepSeekModel}\nЯ могу читать/писать файлы, выполнять команды, работать с GitHub.", false)
+            addMessage("🤖 DeepME готов к работе\nМодель: ${ApiClient.deepSeekModel}\nЯ умею читать и создавать файлы, выполнять команды и работать с GitHub.", false)
         }
 
         sendButton.setOnClickListener {
@@ -97,12 +92,71 @@ class ChatFragment : Fragment() {
         }
     }
 
+    private fun showCopyMenu(msg: ChatMessage) {
+        val options = arrayOf("Копировать текст", "Поделиться")
+        AlertDialog.Builder(requireContext())
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("DeepME", msg.text))
+                        Toast.makeText(context, "✅ Скопировано", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        intent.type = "text/plain"
+                        intent.putExtra(android.content.Intent.EXTRA_TEXT, msg.text)
+                        startActivity(android.content.Intent.createChooser(intent, "Поделиться"))
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showNewProjectDialog() {
+        val input = EditText(requireContext())
+        input.hint = "Название проекта"
+        input.setTextColor(0xFFE6EDF3.toInt())
+        AlertDialog.Builder(requireContext())
+            .setTitle("Новый проект")
+            .setView(input)
+            .setPositiveButton("Создать") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty() && !projects.contains(name)) {
+                    saveHistory()
+                    projects.add(name)
+                    saveProjectsList()
+                    updateProjectSpinner()
+                    projectSpinner.setSelection(projects.indexOf(name))
+                    messages.clear()
+                    currentProject = name
+                    adapter.notifyDataSetChanged()
+                    addMessage("📂 Проект «$name» создан", false)
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun clearCurrentChat() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Очистить чат?")
+            .setMessage("Все сообщения в проекте «$currentProject» будут удалены")
+            .setPositiveButton("Очистить") { _, _ ->
+                messages.clear()
+                adapter.notifyDataSetChanged()
+                saveHistory()
+                addMessage("🗑️ Чат очищен", false)
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
     private fun sendToAI(text: String) {
         if (!TokenManager.isAuthorized(requireContext())) {
-            addMessage("❌ Настройте API ключи в Настройках", false)
+            addMessage("❌ Настройте API ключи в разделе «Настройки»", false)
             return
         }
-
         inputEditText.setText("")
         addMessage(text, true)
         saveHistory()
@@ -133,88 +187,107 @@ class ChatFragment : Fragment() {
         recyclerView.scrollToPosition(messages.size - 1)
     }
 
-    // История проектов
-    private fun getHistoryFile(): File {
+    // История
+    private fun getProjectDir(): File {
         val dir = File(requireContext().filesDir, "projects")
         if (!dir.exists()) dir.mkdirs()
-        return File(dir, "$currentProject.json")
+        return dir
     }
 
-    private fun loadHistory() {
-        val file = getHistoryFile()
-        if (file.exists()) {
-            try {
-                val json = JSONArray(file.readText())
-                messages.clear()
-                for (i in 0 until json.length()) {
-                    val obj = json.getJSONObject(i)
-                    messages.add(ChatMessage(obj.getString("text"), obj.getBoolean("isUser")))
-                }
-                adapter.notifyDataSetChanged()
-                Logger.log("Loaded ${messages.size} messages from $currentProject")
-            } catch (e: Exception) {
-                Logger.log("History load error: ${e.message}")
-            }
-        }
-    }
-
-    private fun saveHistory() {
-        try {
-            val json = JSONArray()
-            for (msg in messages.takeLast(100)) {
-                json.put(JSONObject().put("text", msg.text).put("isUser", msg.isUser))
-            }
-            getHistoryFile().writeText(json.toString())
-        } catch (e: Exception) {
-            Logger.log("History save error: ${e.message}")
-        }
-    }
+    private fun getHistoryFile(project: String): File = File(getProjectDir(), "$project.json")
+    private fun getProjectsFile(): File = File(getProjectDir(), "_projects.json")
 
     private fun loadProjects() {
-        val dir = File(requireContext().filesDir, "projects")
-        if (dir.exists()) {
-            dir.listFiles()?.filter { it.extension == "json" }?.forEach {
-                projects.add(it.nameWithoutExtension)
-            }
+        val file = getProjectsFile()
+        if (file.exists()) {
+            try {
+                val arr = JSONArray(file.readText())
+                projects.clear()
+                for (i in 0 until arr.length()) projects.add(arr.getString(i))
+            } catch (e: Exception) { projects.add("основной") }
         }
-        if (!projects.contains("default")) projects.add(0, "default")
+        if (projects.isEmpty()) projects.add("основной")
     }
 
-    private fun saveProjects() {
-        // Projects are saved as files automatically
+    private fun saveProjectsList() {
+        try {
+            val arr = JSONArray()
+            projects.forEach { arr.put(it) }
+            getProjectsFile().writeText(arr.toString())
+        } catch (e: Exception) { Logger.log("Ошибка сохранения проектов: ${e.message}") }
     }
 
     private fun updateProjectSpinner() {
         val pAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, projects)
         pAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         projectSpinner.adapter = pAdapter
+
+        val currentIdx = projects.indexOf(currentProject)
+        if (currentIdx >= 0) projectSpinner.setSelection(currentIdx)
+
         projectSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                saveHistory()
-                currentProject = projects[pos]
-                messages.clear()
-                loadHistory()
-                Logger.log("Project: $currentProject")
+                if (projects[pos] != currentProject) {
+                    saveHistory()
+                    currentProject = projects[pos]
+                    messages.clear()
+                    loadHistory()
+                    Logger.log("Проект: $currentProject")
+                }
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        saveHistory()
+    private fun loadHistory() {
+        val file = getHistoryFile(currentProject)
+        if (file.exists()) {
+            try {
+                val arr = JSONArray(file.readText())
+                messages.clear()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    messages.add(ChatMessage(obj.getString("text"), obj.getBoolean("isUser")))
+                }
+                adapter.notifyDataSetChanged()
+                if (messages.isNotEmpty()) recyclerView.scrollToPosition(messages.size - 1)
+            } catch (e: Exception) { Logger.log("Ошибка истории: ${e.message}") }
+        }
     }
 
+    private fun saveHistory() {
+        try {
+            val arr = JSONArray()
+            messages.takeLast(200).forEach { msg ->
+                arr.put(JSONObject().put("text", msg.text).put("isUser", msg.isUser))
+            }
+            getHistoryFile(currentProject).writeText(arr.toString())
+        } catch (e: Exception) { Logger.log("Ошибка сохранения: ${e.message}") }
+    }
+
+    override fun onPause() { super.onPause(); saveHistory() }
+    override fun onDestroy() { super.onDestroy(); saveHistory() }
+
     data class ChatMessage(val text: String, val isUser: Boolean)
-    inner class ChatAdapter(private val messages: List<ChatMessage>) : RecyclerView.Adapter<ChatAdapter.VH>() {
+
+    inner class ChatAdapter(
+        private val messages: List<ChatMessage>,
+        private val onLongClick: (ChatMessage) -> Unit
+    ) : RecyclerView.Adapter<ChatAdapter.VH>() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             return VH(LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false))
         }
         override fun onBindViewHolder(holder: VH, pos: Int) {
             val msg = messages[pos]
             holder.textView.text = msg.text
+            holder.textView.setTextIsSelectable(true)
+            holder.textView.movementMethod = LinkMovementMethod.getInstance()
             holder.textView.setBackgroundResource(if (msg.isUser) R.drawable.bg_user_message else R.drawable.bg_assistant_message)
             holder.textView.setTextColor(if (msg.isUser) 0xFFFFFFFF.toInt() else 0xFFE6EDF3.toInt())
+            holder.itemView.setOnLongClickListener {
+                onLongClick(msg)
+                true
+            }
         }
         override fun getItemCount() = messages.size
         inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
