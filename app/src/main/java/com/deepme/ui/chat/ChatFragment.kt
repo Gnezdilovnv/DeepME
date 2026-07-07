@@ -9,6 +9,7 @@ import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,26 +20,19 @@ import com.deepme.network.ChatRequest
 import kotlinx.coroutines.launch
 
 class ChatFragment : Fragment() {
-
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: ChatAdapter
     private lateinit var inputEditText: EditText
     private lateinit var sendButton: ImageButton
     private lateinit var progressBar: ProgressBar
-
     private val messages = mutableListOf<ChatMessage>()
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         return inflater.inflate(R.layout.fragment_chat, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         recyclerView = view.findViewById(R.id.recycler_view)
         inputEditText = view.findViewById(R.id.input_edit_text)
         sendButton = view.findViewById(R.id.send_button)
@@ -48,13 +42,12 @@ class ChatFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.adapter = adapter
 
+        messages.add(ChatMessage("👋 Привет! Я DeepME на базе DeepSeek-V4 Pro", false))
         adapter.notifyDataSetChanged()
 
         sendButton.setOnClickListener {
             val text = inputEditText.text.toString().trim()
-            if (text.isNotEmpty()) {
-                sendMessage(text)
-            }
+            if (text.isNotEmpty()) sendMessage(text)
         }
     }
 
@@ -72,7 +65,6 @@ class ChatFragment : Fragment() {
                 val response = ApiClient.apiService.sendMessage(ChatRequest(text))
                 progressBar.visibility = View.GONE
                 sendButton.isEnabled = true
-                
                 val reply = response.response ?: "❌ Пустой ответ"
                 messages.add(ChatMessage(reply, false))
                 adapter.notifyItemInserted(messages.size - 1)
@@ -80,8 +72,8 @@ class ChatFragment : Fragment() {
             } catch (e: Exception) {
                 progressBar.visibility = View.GONE
                 sendButton.isEnabled = true
-                Toast.makeText(context, "❌ Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
-                messages.add(ChatMessage("❌ Ошибка: ${e.message}", false))
+                Toast.makeText(context, "❌ ${e.message}", Toast.LENGTH_SHORT).show()
+                messages.add(ChatMessage("❌ ${e.message}", false))
                 adapter.notifyItemInserted(messages.size - 1)
             }
         }
@@ -91,25 +83,21 @@ class ChatFragment : Fragment() {
 
     inner class ChatAdapter(private val messages: List<ChatMessage>) :
         RecyclerView.Adapter<ChatAdapter.ViewHolder>() {
-
+        
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_message, parent, false)
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false)
             return ViewHolder(view)
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val message = messages[position]
             holder.textView.text = message.text
-            
             if (message.isUser) {
                 holder.textView.setBackgroundResource(R.drawable.bg_user_message)
-                holder.textView.setTextColor(0xFFFFFFFF)
-                holder.textView.textAlignment = View.TEXT_ALIGNMENT_TEXT_END
+                holder.textView.setTextColor(0xFFFFFFFF.toInt())
             } else {
                 holder.textView.setBackgroundResource(R.drawable.bg_assistant_message)
-                holder.textView.setTextColor(0xFFE6EDF3)
-                holder.textView.textAlignment = View.TEXT_ALIGNMENT_TEXT_START
+                holder.textView.setTextColor(0xFFE6EDF3.toInt())
             }
         }
 
