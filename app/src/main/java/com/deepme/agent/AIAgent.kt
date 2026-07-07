@@ -9,35 +9,42 @@ import com.deepme.utils.Logger
 import com.deepme.utils.TokenManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.File
-import java.io.InputStreamReader
+import java.io.*
+import java.net.HttpURLConnection
+import java.net.URL
 
 object AIAgent {
     private val systemPrompt = """
-Ты DeepME AI Agent с полным доступом к устройству. Ты можешь:
+Ты — DeepME AI Агент, полноценный помощник на русском языке. Ты работаешь на устройстве пользователя и имеешь доступ к:
 
-1. 💬 ОТВЕЧАТЬ на вопросы
-2. 📁 ЧИТАТЬ ФАЙЛЫ — команда: READ_FILE /path/to/file
-3. 📝 ПИСАТЬ ФАЙЛЫ — команда: WRITE_FILE /path/to/file
-   содержимое...
-   END_WRITE
-4. 🖥️ ВЫПОЛНЯТЬ КОМАНДЫ — команда: EXEC command
-5. 🐙 GITHUB — чтение репозиториев: GITHUB_REPOS
-6. 📤 GITHUB — создание файла: GITHUB_CREATE owner/repo/path
-   содержимое...
-   END_CREATE
-7. 📸 АНАЛИЗ ФОТО — опиши что на фото: ANALYZE_IMAGE /path/to/photo.jpg
+📁 ФАЙЛЫ УСТРОЙСТВА
+• Прочитать файл: скажи "читаю /путь/к/файлу" и укажи путь
+• Записать файл: скажи "записываю /путь/к/файлу" и напиши содержимое после двоеточия
 
-Отвечай на русском. Если нужно выполнить действие — используй команды.
-Не выдумывай содержимое файлов без команды READ_FILE.
+🖥️ ТЕРМИНАЛ
+• Выполнить команду: скажи "выполняю команда"
+
+🐙 GITHUB
+• Список репозиториев: скажи "покажи репозитории"
+• Создать файл: скажи "создаю в owner/repo/путь" и напиши содержимое
+• Читать файл из репо: скажи "читаю из owner/repo/путь"
+
+📸 РАБОТА С ФОТО
+• Анализ фото: скажи "анализирую /путь/к/фото.jpg"
+
+ВАЖНО:
+• Отвечай всегда на русском языке
+• Если пользователь просит что-то сделать — выполни действие и сообщи результат
+• Не придумывай содержимое файлов, всегда читай их перед тем как говорить о них
+• Если GitHub токен не настроен — скажи пользователю настроить его в Настройках
+• Для работы с GitHub используй точные пути вида "владелец/репозиторий/путь/к/файлу"
 """.trimIndent()
 
     suspend fun processMessage(context: Context, userMessage: String, history: List<Message>): String {
         val dsKey = TokenManager.getDeepSeekKey(context)
         val ghToken = TokenManager.getGitHubToken(context)
 
-        if (dsKey.isEmpty()) return "❌ Настройте DeepSeek API ключ в Настройках"
+        if (dsKey.isEmpty()) return "❌ Настройте DeepSeek API ключ в разделе «Настройки»"
 
         val messages = mutableListOf(Message("system", systemPrompt))
         messages.addAll(history)
@@ -45,104 +52,126 @@ object AIAgent {
 
         return try {
             var response = withContext(Dispatchers.IO) {
-                ApiClient.deepSeekApi.chat("Bearer $dsKey", DeepSeekRequest(
-                    model = ApiClient.deepSeekModel,
-                    messages = messages
-                ))
+                ApiClient.deepSeekApi.chat("Bearer $dsKey", DeepSeekRequest(model = ApiClient.deepSeekModel, messages = messages))
             }
-
             var reply = response.choices?.firstOrNull()?.message?.content ?: "Нет ответа"
-            var maxIterations = 5
+            var iterations = 0
 
-            while (maxIterations > 0 && containsCommand(reply)) {
-                Logger.log("AI requested action: ${extractCommand(reply)}")
-                val actionResult = executeCommand(context, reply, ghToken)
+            while (iterations < 5 && needsAction(reply)) {
+                Logger.log("Действие AI: ${extractAction(reply)}")
+                val result = executeAction(context, reply, ghToken)
                 messages.add(Message("assistant", reply))
-                messages.add(Message("user", "Результат: $actionResult\nПродолжай или напиши итоговый ответ."))
+                messages.add(Message("user", "Результат действия:\n$result\n\nПродолжай диалог или напиши итоговый ответ на русском языке."))
 
                 response = withContext(Dispatchers.IO) {
-                    ApiClient.deepSeekApi.chat("Bearer $dsKey", DeepSeekRequest(
-                        model = ApiClient.deepSeekModel,
-                        messages = messages
-                    ))
+                    ApiClient.deepSeekApi.chat("Bearer $dsKey", DeepSeekRequest(model = ApiClient.deepSeekModel, messages = messages))
                 }
                 reply = response.choices?.firstOrNull()?.message?.content ?: "Нет ответа"
-                maxIterations--
+                iterations++
             }
-
             reply
         } catch (e: Exception) {
-            "❌ Ошибка: ${e.message}"
+            "❌ Ошибка связи с DeepSeek: ${e.message}"
         }
     }
 
-    private fun containsCommand(text: String): Boolean {
-        return listOf("READ_FILE", "WRITE_FILE", "EXEC", "GITHUB_REPOS", "GITHUB_CREATE", "ANALYZE_IMAGE").any { text.contains(it) }
+    private fun needsAction(text: String): Boolean {
+        val triggers = listOf("читаю ", "записываю ", "выполняю ", "покажи репозитории", "создаю в ", "читаю из ", "анализирую ")
+        return triggers.any { text.lowercase().contains(it) }
     }
 
-    private fun extractCommand(text: String): String {
-        return listOf("READ_FILE", "WRITE_FILE", "EXEC", "GITHUB_REPOS", "GITHUB_CREATE", "ANALYZE_IMAGE")
-            .firstOrNull { text.contains(it) } ?: "UNKNOWN"
+    private fun extractAction(text: String): String {
+        val lower = text.lowercase()
+        return when {
+            lower.contains("читаю из ") && lower.contains("/") -> "GITHUB_READ"
+            lower.contains("создаю в ") && lower.contains("/") -> "GITHUB_CREATE"
+            lower.contains("покажи репозитории") -> "GITHUB_REPOS"
+            lower.contains("читаю ") -> "READ_FILE"
+            lower.contains("записываю ") -> "WRITE_FILE"
+            lower.contains("выполняю ") -> "EXEC"
+            lower.contains("анализирую ") -> "ANALYZE"
+            else -> "UNKNOWN"
+        }
     }
 
-    private suspend fun executeCommand(context: Context, text: String, ghToken: String): String = withContext(Dispatchers.IO) {
+    private suspend fun executeAction(context: Context, text: String, ghToken: String): String = withContext(Dispatchers.IO) {
         try {
+            val lower = text.lowercase()
             when {
-                text.contains("READ_FILE") -> {
-                    val path = text.substringAfter("READ_FILE").trim().lines().first().trim()
+                lower.contains("читаю ") && !lower.contains("читаю из ") -> {
+                    val path = extractPath(text, "читаю")
                     val file = File(path)
                     if (file.exists() && file.isFile) {
-                        file.readText().take(5000) + if (file.readText().length > 5000) "\n... (обрезано)" else ""
+                        val content = file.readText()
+                        if (content.length > 10000) content.take(10000) + "\n... (файл большой, показано начало)"
+                        else content
                     } else "❌ Файл не найден: $path"
                 }
-                text.contains("WRITE_FILE") -> {
-                    val path = text.substringAfter("WRITE_FILE").trim().lines().first().trim()
-                    val content = text.substringAfter("WRITE_FILE").substringAfter("\n").substringBefore("END_WRITE").trim()
+                lower.contains("записываю ") -> {
+                    val path = extractPath(text, "записываю")
+                    val content = extractContent(text)
                     val file = File(path)
                     file.parentFile?.mkdirs()
                     file.writeText(content)
-                    "✅ Файл записан: $path (${content.length} байт)"
+                    "✅ Записано в $path (${content.length} символов)"
                 }
-                text.contains("EXEC") -> {
-                    val cmd = text.substringAfter("EXEC").trim().lines().first().trim()
-                    val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
-                    val reader = BufferedReader(InputStreamReader(process.inputStream))
-                    val errReader = BufferedReader(InputStreamReader(process.errorStream))
-                    val output = StringBuilder()
-                    reader.forEachLine { output.appendLine(it) }
-                    errReader.forEachLine { output.appendLine("ERR: $it") }
+                lower.contains("выполняю ") -> {
+                    val cmd = text.substringAfter("выполняю").trim().lines().first().trim()
+                    val pb = ProcessBuilder("sh", "-c", cmd)
+                    pb.redirectErrorStream(true)
+                    val process = pb.start()
+                    val output = process.inputStream.bufferedReader().readText()
                     process.waitFor()
-                    output.toString().trim().take(3000)
+                    output.ifEmpty { "(команда выполнена, нет вывода)" }.take(5000)
                 }
-                text.contains("GITHUB_REPOS") -> {
-                    if (ghToken.isEmpty()) return@withContext "❌ GitHub токен не настроен"
-                    val repos = ApiClient.gitHubApi.getRepos("Bearer $ghToken", 50)
-                    repos.joinToString("\n") { "📁 ${it.full_name}: ${it.description ?: "нет описания"}" }
+                lower.contains("покажи репозитории") -> {
+                    if (ghToken.isEmpty()) return@withContext "❌ GitHub токен не настроен. Добавьте его в разделе «Настройки»"
+                    val repos = ApiClient.gitHubApi.getRepos("token $ghToken", 50)
+                    if (repos.isEmpty()) "У вас нет репозиториев"
+                    else repos.joinToString("\n") { "📁 ${it.full_name}: ${it.description ?: "нет описания"}" }
                 }
-                text.contains("GITHUB_CREATE") -> {
+                lower.contains("создаю в ") -> {
                     if (ghToken.isEmpty()) return@withContext "❌ GitHub токен не настроен"
-                    val repoPath = text.substringAfter("GITHUB_CREATE").trim().lines().first().trim()
-                    val parts = repoPath.split("/")
-                    if (parts.size < 3) return@withContext "❌ Формат: owner/repo/path/to/file"
-                    val owner = parts[0]
-                    val repo = parts[1]
-                    val path = parts.drop(2).joinToString("/")
-                    val content = text.substringAfter("GITHUB_CREATE").substringAfter("\n").substringBefore("END_CREATE").trim()
+                    val fullPath = text.substringAfter("создаю в").trim().lines().first().trim()
+                    val parts = fullPath.split("/")
+                    if (parts.size < 3) return@withContext "❌ Укажите путь: владелец/репозиторий/путь/файл"
+                    val owner = parts[0]; val repo = parts[1]; val path = parts.drop(2).joinToString("/")
+                    val content = extractContent(text)
                     val encoded = java.util.Base64.getEncoder().encodeToString(content.toByteArray())
-                    ApiClient.gitHubApi.createFile("Bearer $ghToken", owner, repo, path,
-                        GitHubCreateFile("DeepME: $path", encoded))
-                    "✅ Файл создан: $owner/$repo/$path"
+                    ApiClient.gitHubApi.createFile("token $ghToken", owner, repo, path, GitHubCreateFile("DeepME: создание $path", encoded))
+                    "✅ Файл создан в GitHub: $owner/$repo/$path"
                 }
-                text.contains("ANALYZE_IMAGE") -> {
-                    val path = text.substringAfter("ANALYZE_IMAGE").trim().lines().first().trim()
+                lower.contains("читаю из ") -> {
+                    if (ghToken.isEmpty()) return@withContext "❌ GitHub токен не настроен"
+                    val fullPath = text.substringAfter("читаю из").trim().lines().first().trim()
+                    val parts = fullPath.split("/")
+                    if (parts.size < 3) return@withContext "❌ Укажите путь: владелец/репозиторий/путь"
+                    val owner = parts[0]; val repo = parts[1]; val path = parts.drop(2).joinToString("/")
+                    val file = ApiClient.gitHubApi.getFile("token $ghToken", owner, repo, path)
+                    val content = file.content?.let { java.util.Base64.getDecoder().decode(it) }?.toString(Charsets.UTF_8) ?: "Не удалось прочитать"
+                    if (content.length > 10000) content.take(10000) + "\n... (файл большой)" else content
+                }
+                lower.contains("анализирую ") -> {
+                    val path = extractPath(text, "анализирую")
                     val file = File(path)
-                    if (file.exists()) "📸 Файл найден: ${file.name}, размер: ${file.length() / 1024} KB. Отправь фото в чат для анализа."
-                    else "❌ Фото не найдено: $path"
+                    if (file.exists()) "📸 Файл «${file.name}» найден (${file.length() / 1024} КБ). Отправьте его как вложение в чат для детального анализа."
+                    else "❌ Файл не найден: $path"
                 }
-                else -> "Неизвестная команда"
+                else -> "Неизвестное действие"
             }
         } catch (e: Exception) {
             "❌ Ошибка: ${e.message}"
         }
+    }
+
+    private fun extractPath(text: String, keyword: String): String {
+        return text.substringAfter(keyword).trim().lines().first().trim().replace("«", "").replace("»", "")
+    }
+
+    private fun extractContent(text: String): String {
+        val lines = text.lines()
+        val startIdx = lines.indexOfFirst { it.contains("записываю") || it.contains("создаю в") }
+        if (startIdx < 0) return ""
+        return lines.drop(startIdx + 1).joinToString("\n").trim()
     }
 }
