@@ -4,22 +4,20 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.ProgressBar
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.deepme.R
 import com.deepme.network.ApiClient
-import com.deepme.network.ChatRequest
+import com.deepme.network.DeepSeekRequest
+import com.deepme.network.Message
 import com.deepme.utils.Logger
+import com.deepme.utils.TokenManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.net.ConnectException
-import java.net.SocketTimeoutException
+import kotlinx.coroutines.withContext
 
 class ChatFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
@@ -27,104 +25,98 @@ class ChatFragment : Fragment() {
     private lateinit var inputEditText: EditText
     private lateinit var sendButton: ImageButton
     private lateinit var progressBar: ProgressBar
+    private lateinit var modelSpinner: Spinner
     private val messages = mutableListOf<ChatMessage>()
+    private val models = listOf("deepseek-chat", "deepseek-reasoner", "deepseek-v3")
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        Logger.log("ChatFragment onCreateView")
         return inflater.inflate(R.layout.fragment_chat, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Logger.log("ChatFragment onViewCreated")
-        
         recyclerView = view.findViewById(R.id.recycler_view)
         inputEditText = view.findViewById(R.id.input_edit_text)
         sendButton = view.findViewById(R.id.send_button)
         progressBar = view.findViewById(R.id.progress_bar)
+        modelSpinner = view.findViewById(R.id.model_spinner)
 
         adapter = ChatAdapter(messages)
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.adapter = adapter
 
-        val welcomeMsg = ChatMessage("👋 Привет! Я DeepME\\n\\n⚠️ Сервер не подключен.\\nНастройте сервер в Настройках.", false)
-        messages.add(welcomeMsg)
-        adapter.notifyDataSetChanged()
-        Logger.log("ChatFragment initialized with ${messages.size} messages")
+        val spinnerAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, models)
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        modelSpinner.adapter = spinnerAdapter
+        modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
+                ApiClient.deepSeekModel = models[pos]
+                Logger.log("Model: ${models[pos]}")
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        if (TokenManager.isAuthorized(requireContext())) {
+            addMessage("🤖 DeepME готов! Модель: ${ApiClient.deepSeekModel}\\nGitHub: подключен", false)
+        } else {
+            addMessage("⚠️ Настройте API ключи в разделе Настройки", false)
+        }
 
         sendButton.setOnClickListener {
             val text = inputEditText.text.toString().trim()
-            if (text.isNotEmpty()) sendMessage(text)
+            if (text.isNotEmpty()) sendToAI(text)
         }
     }
 
-    private fun sendMessage(text: String) {
-        Logger.log("Sending message: $text")
-        inputEditText.setText("")
-        messages.add(ChatMessage(text, true))
-        adapter.notifyItemInserted(messages.size - 1)
-        recyclerView.scrollToPosition(messages.size - 1)
+    private fun sendToAI(text: String) {
+        val key = TokenManager.getDeepSeekKey(requireContext())
+        if (key.isEmpty()) { addMessage("❌ Не настроен DeepSeek API ключ", false); return }
 
+        inputEditText.setText("")
+        addMessage(text, true)
         progressBar.visibility = View.VISIBLE
         sendButton.isEnabled = false
 
         lifecycleScope.launch {
             try {
-                Logger.log("Calling API...")
-                val response = ApiClient.apiService.sendMessage(ChatRequest(text))
+                val request = DeepSeekRequest(
+                    model = ApiClient.deepSeekModel,
+                    messages = listOf(Message("user", text))
+                )
+                val response = withContext(Dispatchers.IO) {
+                    ApiClient.deepSeekApi.chat("Bearer $key", request)
+                }
                 progressBar.visibility = View.GONE
                 sendButton.isEnabled = true
-                val reply = response.response ?: "❌ Пустой ответ"
-                Logger.log("API response: $reply")
-                messages.add(ChatMessage(reply, false))
-                adapter.notifyItemInserted(messages.size - 1)
-                recyclerView.scrollToPosition(messages.size - 1)
-            } catch (e: ConnectException) {
-                handleError("Сервер недоступен. Проверьте подключение.")
-            } catch (e: SocketTimeoutException) {
-                handleError("Таймаут соединения. Сервер не отвечает.")
+                val reply = response.choices?.firstOrNull()?.message?.content ?: response.error?.message ?: "Пустой ответ"
+                addMessage(reply, false)
             } catch (e: Exception) {
-                Logger.log("Error: ${e.message}")
-                handleError("❌ ${e.message}")
+                progressBar.visibility = View.GONE
+                sendButton.isEnabled = true
+                addMessage("❌ ${e.message}", false)
             }
         }
     }
 
-    private fun handleError(error: String) {
-        Logger.log("ERROR: $error")
-        progressBar.visibility = View.GONE
-        sendButton.isEnabled = true
-        messages.add(ChatMessage(error, false))
+    private fun addMessage(text: String, isUser: Boolean) {
+        messages.add(ChatMessage(text, isUser))
         adapter.notifyItemInserted(messages.size - 1)
         recyclerView.scrollToPosition(messages.size - 1)
-        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
     }
 
     data class ChatMessage(val text: String, val isUser: Boolean)
-
-    inner class ChatAdapter(private val messages: List<ChatMessage>) :
-        RecyclerView.Adapter<ChatAdapter.ViewHolder>() {
-        
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false)
-            return ViewHolder(view)
+    inner class ChatAdapter(private val messages: List<ChatMessage>) : RecyclerView.Adapter<ChatAdapter.VH>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            return VH(LayoutInflater.from(parent.context).inflate(R.layout.item_message, parent, false))
         }
-
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val message = messages[position]
-            holder.textView.text = message.text
-            if (message.isUser) {
-                holder.textView.setBackgroundResource(R.drawable.bg_user_message)
-                holder.textView.setTextColor(0xFFFFFFFF.toInt())
-            } else {
-                holder.textView.setBackgroundResource(R.drawable.bg_assistant_message)
-                holder.textView.setTextColor(0xFFE6EDF3.toInt())
-            }
+        override fun onBindViewHolder(holder: VH, pos: Int) {
+            val msg = messages[pos]
+            holder.textView.text = msg.text
+            holder.textView.setBackgroundResource(if (msg.isUser) R.drawable.bg_user_message else R.drawable.bg_assistant_message)
+            holder.textView.setTextColor(if (msg.isUser) 0xFFFFFFFF.toInt() else 0xFFE6EDF3.toInt())
         }
-
-        override fun getItemCount(): Int = messages.size
-
-        inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        override fun getItemCount() = messages.size
+        inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
             val textView: TextView = itemView.findViewById(R.id.message_text)
         }
     }
