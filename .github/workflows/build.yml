@@ -29,56 +29,23 @@ jobs:
         run: |
           mkdir -p gradle/wrapper
           curl -L "https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar" -o gradle/wrapper/gradle-wrapper.jar
-          ls -la gradle/wrapper/
 
-      - name: Check files before build
-        run: |
-          set -x
-          echo "=== PWD ==="
-          pwd
-          echo "=== LS ==="
-          ls -la
-          echo "=== GRADLEW ==="
-          file gradlew
-          echo "=== BUILD.GRADLE ==="
-          cat build.gradle.kts
-          echo "=== SETTINGS ==="
-          cat settings.gradle.kts
-          echo "=== APP BUILD ==="
-          cat app/build.gradle.kts
-          echo "=== SOURCES ==="
-          find . -name "*.kt" -o -name "*.xml" | head -30
+      - run: chmod +x gradlew
 
       - name: Build APK
-        run: |
-          set -x
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-          echo "=== BUILD EXIT: $? ==="
-
-      - name: Find APK
-        run: |
-          echo "=== SEARCHING APK ==="
-          find . -name "*.apk" -ls 2>/dev/null
-          echo "=== BUILD DIR ==="
-          ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "NO APK DIR"
+        run: ./gradlew assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
           name: DeepME-debug
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
 
-      - name: Push APK to repo
+      - name: Push APK to releases
         run: |
-          APK=$(find . -name "*.apk" 2>/dev/null | head -1)
-          if [ -n "$APK" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            mkdir -p releases
-            cp "$APK" releases/DeepME-debug.apk
-            git add releases/DeepME-debug.apk
-            git commit -m "Auto build APK" && git push && echo "PUSHED" || echo "No changes"
-          else
-            echo "NO APK FOUND"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf releases
+          mkdir -p releases
+          cp app/build/outputs/apk/debug/app-debug.apk releases/DeepME-debug.apk
+          git add releases/DeepME-debug.apk
+          git commit -m "🤖 Автосборка APK" && git push || echo "No changes"
