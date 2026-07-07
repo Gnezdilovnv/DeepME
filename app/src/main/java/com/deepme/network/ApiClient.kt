@@ -11,14 +11,24 @@ object ApiClient {
     private const val DEEPSEEK_URL = "https://api.deepseek.com/"
     private const val GITHUB_URL = "https://api.github.com/"
 
-    var deepSeekModel = "deepseek-chat"
+    // Модели V4 (актуальные)
+    var deepSeekModel = "deepseek-v4-pro"
+    
+    val availableModels = listOf(
+        ModelInfo("deepseek-v4-flash", "DeepSeek V4 Flash", "Быстрый", "0.14", "0.28"),
+        ModelInfo("deepseek-v4-pro", "DeepSeek V4 Pro", "Максимальный", "0.27", "1.10"),
+        ModelInfo("deepseek-chat", "DeepSeek Chat (устар.)", "До 24.07.2026", "0.27", "1.10"),
+        ModelInfo("deepseek-reasoner", "DeepSeek Reasoner (устар.)", "До 24.07.2026", "0.55", "2.19")
+    )
+
+    data class ModelInfo(val id: String, val name: String, val desc: String, val priceIn: String, val priceOut: String)
 
     private val logging = HttpLoggingInterceptor { Logger.log("HTTP: $it") }
         .apply { level = HttpLoggingInterceptor.Level.BODY }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
         .addInterceptor(logging)
         .build()
 
