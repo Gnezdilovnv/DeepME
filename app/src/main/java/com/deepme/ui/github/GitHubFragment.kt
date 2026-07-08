@@ -12,8 +12,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.deepme.R
+import com.deepme.model.Repository
 import com.deepme.network.ApiClient
-import com.deepme.network.GitHubRepo
 import com.deepme.utils.TokenManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +23,7 @@ class GitHubFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var progressBar: ProgressBar
     private lateinit var errorText: TextView
-    private val repos = mutableListOf<GitHubRepo>()
+    private val repos = mutableListOf<Repository>()
     private lateinit var adapter: RepoAdapter
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -37,7 +37,7 @@ class GitHubFragment : Fragment() {
         errorText = view.findViewById(R.id.github_error)
 
         adapter = RepoAdapter(repos) { repo ->
-            Toast.makeText(context, "📁 ${repo.full_name}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, repo.full_name, Toast.LENGTH_SHORT).show()
         }
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.adapter = adapter
@@ -48,12 +48,10 @@ class GitHubFragment : Fragment() {
         val token = TokenManager.getGitHubToken(requireContext())
         if (token.isEmpty()) {
             errorText.visibility = View.VISIBLE
-            errorText.text = "❌ Введите GitHub Token в Настройках"
+            errorText.text = "Введите GitHub Token в Настройках"
             return
         }
         progressBar.visibility = View.VISIBLE
-        errorText.visibility = View.GONE
-
         lifecycleScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) {
@@ -63,30 +61,25 @@ class GitHubFragment : Fragment() {
                 repos.addAll(list)
                 adapter.notifyDataSetChanged()
                 progressBar.visibility = View.GONE
-                if (repos.isEmpty()) {
-                    errorText.visibility = View.VISIBLE
-                    errorText.text = "📭 Нет репозиториев"
-                }
             } catch (e: Exception) {
                 progressBar.visibility = View.GONE
                 errorText.visibility = View.VISIBLE
-                errorText.text = "❌ ${e.message}"
+                errorText.text = e.message
             }
         }
     }
 
     inner class RepoAdapter(
-        private val items: List<GitHubRepo>,
-        private val onClick: (GitHubRepo) -> Unit
+        private val items: List<Repository>,
+        private val onClick: (Repository) -> Unit
     ) : RecyclerView.Adapter<RepoAdapter.VH>() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_repo, parent, false)
-            return VH(view)
+            return VH(LayoutInflater.from(parent.context).inflate(R.layout.item_repo, parent, false))
         }
         override fun onBindViewHolder(holder: VH, position: Int) {
             val repo = items[position]
-            holder.nameView.text = "📁 ${repo.full_name}"
-            holder.descView.text = repo.description ?: "Нет описания"
+            holder.nameView.text = repo.full_name
+            holder.descView.text = repo.description ?: ""
             holder.itemView.setOnClickListener { onClick(repo) }
         }
         override fun getItemCount() = items.size
