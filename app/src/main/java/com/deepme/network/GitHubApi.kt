@@ -1,0 +1,5 @@
+package com.deepme.network
+import com.deepme.model.*
+import retrofit2.Response
+import retrofit2.http.*
+interface GitHubApi{@GET("user/repos")suspend fun getRepos(@Header("Authorization")a:String,@Query("per_page")p:Int=50):List<Repository>;@POST("user/repos")suspend fun createRepo(@Header("Authorization")a:String,@Body r:CreateRepoRequest):Response<Repository>;@GET("repos/{owner}/{repo}/contents/{path}")suspend fun getContent(@Header("Authorization")a:String,@Path("owner")o:String,@Path("repo")r:String,@Path("path")p:String):Response<ContentItem>;@PUT("repos/{owner}/{repo}/contents/{path}")suspend fun createOrUpdateFile(@Header("Authorization")a:String,@Path("owner")o:String,@Path("repo")r:String,@Path("path")p:String,@Body b:FileContentRequest):Response<Any>;@DELETE("repos/{owner}/{repo}/contents/{path}")suspend fun deleteFile(@Header("Authorization")a:String,@Path("owner")o:String,@Path("repo")r:String,@Path("path")p:String,@Body b:DeleteFileRequest):Response<Any>}
